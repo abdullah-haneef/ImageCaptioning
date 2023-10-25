@@ -1,23 +1,21 @@
 import torch
 import torch.nn as nn
+import statistics
 import torchvision.models as models
 
+
 class EncoderCNN(nn.Module):
-    def __init__(self, embed_size, train_CNN = False):
+    def __init__(self, embed_size, train_CNN=False):
         super(EncoderCNN, self).__init__()
         self.train_CNN = train_CNN
-        self.inception = models.inception_v3(pretrained = True, aux_logits = False)
+        self.inception = models.inception_v3(pretrained=True, aux_logits=False)
         self.inception.fc = nn.Linear(self.inception.fc.in_features, embed_size)
         self.relu = nn.ReLU()
+        self.times = []
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, images):
         features = self.inception(images)
-        for name, param in self.inception.named_parameters():
-            if "fc.weight" in name or "fc.bias" in name:
-                param.requires_grad = True
-            else:
-                param.requires_grad = self.train_CNN
         return self.dropout(self.relu(features))
 
 
@@ -31,7 +29,7 @@ class DecoderRNN(nn.Module):
 
     def forward(self, features, captions):
         embeddings = self.dropout(self.embed(captions))
-        embeddings = torch.cat((features.unsqueeze(0), embeddings), dim = 0)
+        embeddings = torch.cat((features.unsqueeze(0), embeddings), dim=0)
         hiddens, _ = self.lstm(embeddings)
         outputs = self.linear(hiddens)
         return outputs
@@ -57,9 +55,8 @@ class CNNtoRNN(nn.Module):
 
             for _ in range(max_length):
                 hiddens, states = self.decoderRNN.lstm(x, states)
-                output = self.decoderRNN.linear(hiddens.unsqueeze(0))
+                output = self.decoderRNN.linear(hiddens.squeeze(0))
                 predicted = output.argmax(1)
-
                 result_caption.append(predicted.item())
                 x = self.decoderRNN.embed(predicted).unsqueeze(0)
 
